@@ -36,9 +36,11 @@ reader = csv.DictReader(csvfile)
 
 art_keywords = {}
 
+art_entities = {}
+
 for row in reader:
 	name = (str(row['First_Name']+' '+row['Last_Name']).replace("'",""))
-	email = row['Email_Address']
+	email = (str(row['Email_Address']).replace("'",""))
 	company = (str(row['Company_Name']).replace("'",""))
 	industry = (str(row['Industry']).replace("'",""))
 	iD = row['Id']
@@ -105,5 +107,23 @@ for row in reader:
 							at_keywords = graph.cypher.execute(keyword_node)
 
 							graph.create(Path(article.one,"has keyword",at_keywords.one))
+						# exit()
+
+
+				if art not in art_entities.keys():
+					art_entities[art] = []
+					response = alchemyapi.entities('url', art, {'sentiment': 1})
+					if response['status'] == 'OK':
+						for entities in response['entities']:
+							# print('text: ', entities['text'].encode('utf-8'))
+							key = str(entities['text'].encode('utf-8'))
+							art_entities[art].append(key)
+
+							entities_node = """ MERGE (entities:Entities{text:'"""+key+"""'})
+							Return entities;
+							"""
+							at_entities = graph.cypher.execute(entities_node)
+
+							graph.create(Path(article.one,"has entities",at_entities.one))
 						# exit()
 
