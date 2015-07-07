@@ -1,5 +1,12 @@
 import csv, json, re
 from py2neo import Graph, Path
+from alchemyapi import AlchemyAPI
+import json, sys
+
+# Create the AlchemyAPI Object
+alchemyapi = AlchemyAPI()
+
+
 graph = Graph("http://neo4j:root@localhost:7474/db/data/")
 
 # for name in ["Alice", "Bob", "Carol"]:
@@ -15,12 +22,19 @@ reader = csv.DictReader(csvfile)
 articles = {}
 for row in reader:
 	if row['Name']!='':	
-		articles[(str(row['Name']).replace("'",""))]='https://www.brighttalk.com'+row['Entry Page']
+		if (str(row['Name']).replace("'","")) in articles.keys():
+			articles[(str(row['Name']).replace("'",""))].append('https://www.brighttalk.com'+row['Entry Page'])
+		else:
+			articles[(str(row['Name']).replace("'",""))] = []
+			articles[(str(row['Name']).replace("'",""))].append('https://www.brighttalk.com'+row['Entry Page'])
+			
 csvfile.close()	
 
 csvfile = open('MarketoLeads.csv')
 
 reader = csv.DictReader(csvfile)
+
+art_keywords = {}
 
 for row in reader:
 	name = (str(row['First_Name']+' '+row['Last_Name']).replace("'",""))
@@ -30,35 +44,66 @@ for row in reader:
 	iD = row['Id']
 	job = (str(row['Job_Title']).replace("'",""))
 
-	individual_node = """ Create (idividual:Individuals{id:'"""+iD+"""',name:'"""+name+"""',email:'"""+email+"""'})
-	Return idividual;
-	"""
-	individual = graph.cypher.execute(individual_node)
+	if name!='' and email!='' and iD!='':
 
-	company_node = """ Create (company:Company{name:'"""+company+"""'})
-	Return company;
-	"""
-	company = graph.cypher.execute(company_node)
-
-	job_node = """ Create (job:Job_Title{name:'"""+job+"""'})
-	Return job;
-	"""
-	job = graph.cypher.execute(job_node)
-	
-	industry_node = """ Create (industry:Industry{name:'"""+industry+"""'})
-	Return industry;
-	"""
-	industry = graph.cypher.execute(industry_node)
-
-	graph.create(Path(individual.one,"works at",company.one))
-	graph.create(Path(individual.one,"works as",job.one))
-	graph.create(Path(individual.one,"is in Industry",industry.one))
-	
-	if name in articles.keys():
-		article_node = """ Create (article:Article{url:'"""+articles[name]+"""'})
-		Return article;
+		individual_node = """ MERGE (idividual:Individuals{id:'"""+iD+"""',name:'"""+name+"""',email:'"""+email+"""'})
+		Return idividual;
 		"""
-		article = graph.cypher.execute(article_node)
+		individual = graph.cypher.execute(individual_node)
 
-		graph.create(Path(individual.one,"reads",article.one))
+
+		if company!= '':
+			company_node = """ MERGE (company:Company{name:'"""+company+"""'})
+			Return company;
+			"""
+			company = graph.cypher.execute(company_node)
+
+			graph.create(Path(individual.one,"works at",company.one))
+
+
+		if job != '':
+			job_node = """ MERGE (job:Job_Title{name:'"""+job+"""'})
+			Return job;
+			"""
+			job = graph.cypher.execute(job_node)
+
+			graph.create(Path(individual.one,"works as",job.one))
+
+
+		
+		if industry != '':
+			industry_node = """ MERGE (industry:Industry{name:'"""+industry+"""'})
+			Return industry;
+			"""
+			industry = graph.cypher.execute(industry_node)
+
+			graph.create(Path(individual.one,"is in Industry",industry.one))
+
+		
+		
+		if name in articles.keys():
+			for art in articles[name]:
+				article_node = """ MERGE (article:Article{url:'"""+art+"""'})
+				Return article;
+				"""
+				article = graph.cypher.execute(article_node)
+
+				graph.create(Path(individual.one,"read",article.one))
+
+				if art not in art_keywords.keys():
+					art_keywords[art] = []
+					response = alchemyapi.keywords('url', art, {'sentiment': 1})
+					if response['status'] == 'OK':
+						for keyword in response['keywords']:
+							# print('text: ', keyword['text'].encode('utf-8'))
+							key = str(keyword['text'].encode('utf-8'))
+							art_keywords[art].append(key)
+
+							keyword_node = """ MERGE (keyword:Keywords{text:'"""+key+"""'})
+							Return keyword;
+							"""
+							at_keywords = graph.cypher.execute(keyword_node)
+
+							graph.create(Path(article.one,"has keyword",at_keywords.one))
+						# exit()
 
