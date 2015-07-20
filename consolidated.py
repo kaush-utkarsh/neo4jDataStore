@@ -3,6 +3,7 @@ from py2neo import Graph, Path
 import json, sys
 from alchemyapi import AlchemyAPI
 from smtplib import SMTP
+import ConfigParser
 import datetime
 
 from_addr = "Utkarsh Kaushik<ukaushik@algoscale.com>"
@@ -11,8 +12,31 @@ to_addr = "Utkarsh Kaushik<ukaushik@algoscale.com>, Neeraj Agarwal<neeraj@algosc
 start = datetime.datetime.now().strftime( "%d/%m/%Y %H:%M" )
 
 csvFilePath = ''
+config_file = ''
+def leads(csvFilePath, config_file):
+	
+	config = ConfigParser.ConfigParser()
+	config.read(config_file)
 
-def leads(csvFilePath):
+	# parse config file 
+	config_last_name = config.get("leads","last_name")
+	config_first_name = config.get("leads","first_name")
+	config_l_id = config.get("leads","l_id")
+	config_job = config.get("leads","job")
+	config_company = config.get("leads","company")
+	config_email = config.get("leads","email")
+	config_phone = config.get("leads","phone")
+	config_lead_score = config.get("leads","lead_score")
+	config_lead_source = config.get("leads","lead_source")
+	config_updated_at = config.get("leads","updated_at")
+	config_job_function = config.get("leads","job_function")
+	config_industry = config.get("leads","industry")
+	config_community = config.get("leads","community")
+	config_sub_community = config.get("leads","sub_community")
+
+
+
+	# fetch from csv and store in graph
 	print "Storing Leads"
 	graph = Graph("http://neo4j:root@localhost:7474/db/data/")
 
@@ -25,20 +49,25 @@ def leads(csvFilePath):
 
 	for row in reader:
 		try:
-			name = (str(row['First_Name']+' '+row['Last_Name']).replace("'",""))
-			email = (str(row['Email_Address']).replace("'",""))
-			company = (str(row['Company_Name']).replace("'",""))
-			industry = (str(row['Industry']).replace("'",""))
-			community = (str(row['Community_Segment']).replace("'",""))
-			sub_community = (str(row['Sub_Community']).replace("'",""))
+			name = (str(row[config_first_name]+' '+row[config_last_name]).replace("'",""))
+			email = (str(row[config_email]).replace("'",""))
+			company = (str(row[config_company]).replace("'",""))
+			industry = (str(row[config_industry]).replace("'",""))
+			community = (str(row[config_community]).replace("'",""))
+			sub_community = (str(row[config_sub_community]).replace("'",""))
+			
+			phone = (str(row[config_phone]).replace("'",""))
+			lead_score = (str(row[config_lead_score]).replace("'",""))
+			lead_source = (str(row[config_lead_source]).replace("'",""))
+			updated_at = (str(row[config_updated_at]).replace("'",""))
 			
 
-			iD = row['Id']
-			job = (str(row['Job_Title']).replace("'",""))
+			iD = row[config_l_id]
+			job = (str(row[config_job]).replace("'",""))
 
 			if name!='' and email!='' and iD!='':
 
-				individual_node = """ MERGE (idividual:Individuals{id:'"""+iD+"""',name:'"""+name+"""',email:'"""+email+"""'})
+				individual_node = """ MERGE (idividual:Individuals{id:'"""+iD+"""',name:'"""+name+"""',email:'"""+email+"""',phone:'"""+phone+"""',lead_source:'"""+lead_source+"""',lead_score:'"""+lead_score+"""',updated_at:'"""+updated_at+"""'})
 				Return idividual;
 				"""
 				individual = graph.cypher.execute(individual_node)
@@ -50,7 +79,9 @@ def leads(csvFilePath):
 					Return company;
 					"""
 					company = graph.cypher.execute(company_node)
-					graph.create(Path(individual.one,"works_at",company.one,))
+					
+					if len(list(graph.match(start_node=individual.one,end_node=company.one, rel_type="works_at"))) == 0:
+						graph.create(Path(individual.one,"works_at",company.one))
 				
 				if community!= '':
 					community_node = """ MERGE (community:Community{name:'"""+community+"""'})
@@ -58,7 +89,8 @@ def leads(csvFilePath):
 					"""
 					community = graph.cypher.execute(community_node)
 
-					graph.create(Path(individual.one,"belongs_to_community",community.one))
+					if len(list(graph.match(start_node=individual.one,end_node=community.one, rel_type="belongs_to_community"))) == 0:
+						graph.create(Path(individual.one,"belongs_to_community",community.one))
 				
 				if sub_community!= '':
 					sub_community_node = """ MERGE (sub_community:Sub_Community{name:'"""+sub_community+"""'})
@@ -66,7 +98,8 @@ def leads(csvFilePath):
 					"""
 					sub_community = graph.cypher.execute(sub_community_node)
 
-					graph.create(Path(individual.one,"belongs_to_sub_community",sub_community.one))
+					if len(list(graph.match(start_node=individual.one,end_node=sub_community.one, rel_type="belongs_to_sub_community"))) == 0:
+						graph.create(Path(individual.one,"belongs_to_sub_community",sub_community.one))
 				
 
 				if job != '':
@@ -75,7 +108,8 @@ def leads(csvFilePath):
 					"""
 					job = graph.cypher.execute(job_node)
 
-					graph.create(Path(individual.one,"works_as",job.one))
+					if len(list(graph.match(start_node=individual.one,end_node=job.one, rel_type="works_as"))) == 0:
+						graph.create(Path(individual.one,"works_as",job.one))
 
 
 				
@@ -85,17 +119,39 @@ def leads(csvFilePath):
 					"""
 					industry = graph.cypher.execute(industry_node)
 
-					graph.create(Path(individual.one,"is_in_Industry",industry.one))
+					if len(list(graph.match(start_node=individual.one,end_node=industry.one, rel_type="is_in_Industry"))) == 0:
+						graph.create(Path(individual.one,"is_in_Industry",industry.one))
 		except Exception,e:
-			print e
-			pass
+			raise
+			exit()
 
 	reslt['individuals'] = str(indi_count)
 
 	return reslt
 
-def articles_func(csvFilePath):
+def articles_func(csvFilePath,config_file):
 	
+
+	config = ConfigParser.ConfigParser()
+	config.read(config_file)
+
+	# parse config file 
+	config_lead = config.get("articles","lead")
+	config_first_visit = config.get("articles","first_visit")
+	config_referer_url = config.get("articles","referer_url")
+	config_url = config.get("articles","url")
+	config_employee_name = config.get("articles","employee_name")
+	config_employee_job = config.get("articles","employee_job")
+	config_employee_company = config.get("articles","employee_company")
+	config_inferred_company = config.get("articles","inferred_company")
+	config_inferred_country = config.get("articles","inferred_country")
+	config_inferred_state = config.get("articles","inferred_state")
+	config_inferred_city = config.get("articles","inferred_city")
+	config_inferred_phone_area = config.get("articles","inferred_phone_area")
+	config_last_visit = config.get("articles","last_visit")
+
+
+
 	print "storing articles"
 	graph = Graph("http://neo4j:root@localhost:7474/db/data/")
 
@@ -108,28 +164,37 @@ def articles_func(csvFilePath):
 
 		try:
 
-			if row['Name']!='':	
-				name = (str(row['Name']).replace("'",""))
-				art = 'https://www.brighttalk.com'+row['Entry Page']
+			if row[config_employee_name]!='':	
+				name = (str(row[config_employee_name]).replace("'",""))
+				art = 'https://www.brighttalk.com'+row[config_url]
 
-				article_check_query =  """MATCH (n:Article{url:'"""+art+"""'})
-										Return count(n) as count"""
+				individual_node = """ MERGE (idividual:Individuals{name:'"""+name+"""'})
+				Return idividual;
+				"""
+				individual = graph.cypher.execute(individual_node)
 
-				res = graph.cypher.execute(article_check_query)
+				article_node = """ MERGE (article:Article{url:'"""+art+"""',processed:'no'})
+				Return article;
+				"""
+				article = graph.cypher.execute(article_node)
+				art_count = art_count + 1
 
-				if str(res[0]['count']) == '0':
+				rel_dict={}
 
-					individual_node = """ MERGE (idividual:Individuals{name:'"""+name+"""'})
-					Return idividual;
-					"""
-					individual = graph.cypher.execute(individual_node)
-
-					article_node = """ MERGE (article:Article{url:'"""+art+"""',processed:'no'})
-					Return article;
-					"""
-					article = graph.cypher.execute(article_node)
-					art_count = art_count + 1
-					graph.create(Path(individual.one,"read",article.one))
+				rel_dict["lead"] = (str(row[config_lead]).replace("'","")) 
+				rel_dict["first_visit"] = (str(row[config_first_visit]).replace("'","")) 
+				rel_dict["referer_url"] = (str(row[config_referer_url]).replace("'","")) 
+				rel_dict["employee_job"] = (str(row[config_employee_job]).replace("'","")) 
+				rel_dict["employee_company"] = (str(row[config_employee_company]).replace("'","")) 
+				rel_dict["inferred_company"] = (str(row[config_inferred_company]).replace("'","")) 
+				rel_dict["inferred_country"] = (str(row[config_inferred_country]).replace("'","")) 
+				rel_dict["inferred_state"] = (str(row[config_inferred_state]).replace("'","")) 
+				rel_dict["inferred_city"] = (str(row[config_inferred_city]).replace("'","")) 
+				rel_dict["inferred_phone_area"] = (str(row[config_inferred_phone_area]).replace("'","")) 
+				rel_dict["last_visit"] = (str(row[config_last_visit]).replace("'","")) 
+				
+				if len(list(graph.match(start_node=individual.one,end_node=article.one, rel_type=("read",rel_dict)))) == 0:
+					graph.create(Path(individual.one,("read",rel_dict),article.one))
 
 
 		except Exception,e:
@@ -197,9 +262,11 @@ def key_entity():
 					Return keyword;
 					"""
 					at_keywords = graph.cypher.execute(keyword_node)
-					pth = Path(article.one,("has_keyword",rel_dict),at_keywords.one)
-					graph.create(pth)
-					keyword_count = keyword_count + 1
+
+					if len(list(graph.match(start_node=article.one,end_node=at_keywords.one, rel_type=("has_keyword",rel_dict)))) == 0:
+						pth = Path(article.one,("has_keyword",rel_dict),at_keywords.one)
+						graph.create(pth)
+						keyword_count = keyword_count + 1
 
 
 		if count >= 1000:
@@ -228,11 +295,12 @@ def key_entity():
 					entities_node = """ MERGE (entities:Entities{text:'"""+key+"""'})
 					Return entities;
 					"""
-					at_entities = graph.cypher.execute(entities_node)
-					pth = Path(article.one,("has_entity",rel_dict),at_entities.one)
-					graph.create(pth)
-					
-					entity_count  = entity_count + 1
+					if len(list(graph.match(start_node=article.one,end_node=at_entities.one, rel_type=("has_entity",rel_dict)))) == 0:		
+						at_entities = graph.cypher.execute(entities_node)
+						pth = Path(article.one,("has_entity",rel_dict),at_entities.one)
+						graph.create(pth)
+						
+						entity_count  = entity_count + 1
 
 	return {'articles':str(art_count),'keywords':str(keyword_count),'entities':str(entity_count)}
 
@@ -266,18 +334,48 @@ else:
 
 	if action == 'leads':
 		csvFilePath = sys.argv[2]
+		config_file = sys.argv[3]
 		try:
-			resultDict = leads(csvFilePath)
+			resultDict = leads(csvFilePath,config_file)
 		except Exception,e:
 			print e
+			msg = """
+			Hi, \n 
+			This is an update related to the job triggered on """+str(start)+""", for the insertion of data in your Neo4J graph base. \n
+			The code could not complete the run because of insufficient parameters supplied to the query \n 
+			Regards """
+
+			subj = "Update for uLytics job on Neo4J"
+
+
+			msgBod = "From: %s\nTo: %s\nSubject: %s\nDate: %s\n\n%s" % ( from_addr, to_addr, subj, start, msg )
+
+			emailUpdate(from_addr,to_addr,msgBod)
+
+			exit()
 			pass
 
 	elif action == 'articles':
 		csvFilePath = sys.argv[2]
+		config_file = sys.argv[3]
 		try:
-			resultDict = articles_func(csvFilePath)
+			resultDict = articles_func(csvFilePath,config_file)
 		except Exception,e:
 			print e
+			msg = """
+			Hi, \n 
+			This is an update related to the job triggered on """+str(start)+""", for the insertion of data in your Neo4J graph base. \n
+			The code could not complete the run because of insufficient parameters supplied to the query \n 
+			Regards """
+
+			subj = "Update for uLytics job on Neo4J"
+
+
+			msgBod = "From: %s\nTo: %s\nSubject: %s\nDate: %s\n\n%s" % ( from_addr, to_addr, subj, start, msg )
+
+			emailUpdate(from_addr,to_addr,msgBod)
+
+			exit()
 			pass
 
 	else:
