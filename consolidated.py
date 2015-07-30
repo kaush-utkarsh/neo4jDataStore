@@ -67,10 +67,18 @@ def leads(csvFilePath, config_file):
 
 			if name!='' and email!='' and iD!='':
 
-				individual_node = """ MERGE (idividual:Individuals{id:'"""+iD+"""',name:'"""+name+"""',email:'"""+email+"""',phone:'"""+phone+"""',lead_source:'"""+lead_source+"""',lead_score:'"""+lead_score+"""',updated_at:'"""+updated_at+"""'})
+				individual_node = """ MERGE (idividual:Individuals{id:'"""+iD+"""',name:'"""+name+"""',email:'"""+email+"""'})
 				Return idividual;
 				"""
 				individual = graph.cypher.execute(individual_node)
+
+
+				individual.one.properties["phone"] = phone
+				individual.one.properties["lead_source"] = lead_source
+				individual.one.properties["lead_score"] = lead_score
+				individual.one.properties["updated_at"] = updated_at
+
+				individual.one.push()				
 
 				indi_count = indi_count + 1
 
@@ -121,6 +129,7 @@ def leads(csvFilePath, config_file):
 
 					if len(list(graph.match(start_node=individual.one,end_node=industry.one, rel_type="is_in_Industry"))) == 0:
 						graph.create(Path(individual.one,"is_in_Industry",industry.one))
+				
 		except Exception,e:
 			raise
 			exit()
