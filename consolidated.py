@@ -17,22 +17,18 @@ def leads(csvFilePath, config_file):
 	
 	config = ConfigParser.ConfigParser()
 	config.read(config_file)
-
+	userCol = config.options("user")
+	industryCol = config.options("industry")
+	communityCol = config.options("community")
+	countryCol = config.options("country")
+	
 	# parse config file 
-	config_last_name = config.get("leads","last_name")
-	config_first_name = config.get("leads","first_name")
-	config_l_id = config.get("leads","l_id")
-	config_job = config.get("leads","job")
-	config_company = config.get("leads","company")
-	config_email = config.get("leads","email")
-	config_phone = config.get("leads","phone")
-	config_lead_score = config.get("leads","lead_score")
-	config_lead_source = config.get("leads","lead_source")
-	config_updated_at = config.get("leads","updated_at")
-	config_job_function = config.get("leads","job_function")
-	config_industry = config.get("leads","industry")
-	config_community = config.get("leads","community")
-	config_sub_community = config.get("leads","sub_community")
+	config_l_id = config.get("user","Id")
+	config_email = config.get("user","email")
+	config_industry = config.get("industry","industry")
+	config_community = config.get("community","community")
+	config_sub_community = config.get("community","sub_community")
+	config_country = config.get("country","country")
 
 
 
@@ -49,48 +45,56 @@ def leads(csvFilePath, config_file):
 
 	for row in reader:
 		try:
-			name = (str(row[config_first_name]+' '+row[config_last_name]).replace("'",""))
 			email = (str(row[config_email]).replace("'",""))
-			company = (str(row[config_company]).replace("'",""))
 			industry = (str(row[config_industry]).replace("'",""))
 			community = (str(row[config_community]).replace("'",""))
 			sub_community = (str(row[config_sub_community]).replace("'",""))
-			
-			phone = (str(row[config_phone]).replace("'",""))
-			lead_score = (str(row[config_lead_score]).replace("'",""))
-			lead_source = (str(row[config_lead_source]).replace("'",""))
-			updated_at = (str(row[config_updated_at]).replace("'",""))
+			country = (str(row[config_country]).replace("'",""))
 			
 
 			iD = row[config_l_id]
-			job = (str(row[config_job]).replace("'",""))
 
-			if name!='' and email!='' and iD!='':
+			if email!='' and iD!='':
 
-				individual_node = """ MERGE (idividual:Individuals{id:'"""+iD+"""',name:'"""+name+"""',email:'"""+email+"""'})
-				Return idividual;
-				"""
-				individual = graph.cypher.execute(individual_node)
+				try:
 
+					individual_node = """ MERGE (idividual:Individuals{id:'"""+iD+"""',email:'"""+email+"""'})
+					Return idividual;
+					"""
+					individual = graph.cypher.execute(individual_node)
 
-				individual.one.properties["phone"] = phone
-				individual.one.properties["lead_source"] = lead_source
-				individual.one.properties["lead_score"] = lead_score
-				individual.one.properties["updated_at"] = updated_at
+					for u in userCol:
 
-				individual.one.push()				
+						tmp = config.get("user",u)
+		
+						individual.one.properties[u] = str(row[tmp]).replace("'","")
 
+					individual.one.push()				
+				except Exception,e:
+					print e
+					continue
+				# exit()
 				indi_count = indi_count + 1
 
-				if company!= '':
-					company_node = """ MERGE (company:Company{name:'"""+company+"""'})
-					Return company;
+				if industry != '':
+					company_node = """ MERGE (industry:Industry{name:'"""+industry+"""'})
+					Return industry;
 					"""
 					company = graph.cypher.execute(company_node)
 					
-					if len(list(graph.match(start_node=individual.one,end_node=company.one, rel_type="works_at"))) == 0:
-						graph.create(Path(individual.one,"works_at",company.one))
+					if len(list(graph.match(start_node=individual.one,end_node=company.one, rel_type="is_in_Industry"))) == 0:
+						graph.create(Path(individual.one,"is_in_Industry",company.one))
 				
+				if country != '':
+					company_node = """ MERGE (country:Country{name:'"""+country+"""'})
+					Return country;
+					"""
+					company = graph.cypher.execute(company_node)
+					
+					if len(list(graph.match(start_node=individual.one,end_node=company.one, rel_type="lives_in_country"))) == 0:
+						graph.create(Path(individual.one,"lives_in_country",company.one))
+				
+
 				if community!= '':
 					community_node = """ MERGE (community:Community{name:'"""+community+"""'})
 					Return community;
@@ -108,27 +112,7 @@ def leads(csvFilePath, config_file):
 
 					if len(list(graph.match(start_node=individual.one,end_node=sub_community.one, rel_type="belongs_to_sub_community"))) == 0:
 						graph.create(Path(individual.one,"belongs_to_sub_community",sub_community.one))
-				
 
-				if job != '':
-					job_node = """ MERGE (job:Job_Title{name:'"""+job+"""'})
-					Return job;
-					"""
-					job = graph.cypher.execute(job_node)
-
-					if len(list(graph.match(start_node=individual.one,end_node=job.one, rel_type="works_as"))) == 0:
-						graph.create(Path(individual.one,"works_as",job.one))
-
-
-				
-				if industry != '':
-					industry_node = """ MERGE (industry:Industry{name:'"""+industry+"""'})
-					Return industry;
-					"""
-					industry = graph.cypher.execute(industry_node)
-
-					if len(list(graph.match(start_node=individual.one,end_node=industry.one, rel_type="is_in_Industry"))) == 0:
-						graph.create(Path(individual.one,"is_in_Industry",industry.one))
 				
 		except Exception,e:
 			raise
@@ -144,20 +128,10 @@ def articles_func(csvFilePath,config_file):
 	config = ConfigParser.ConfigParser()
 	config.read(config_file)
 
+	articleCol = config.options("articles")
 	# parse config file 
-	config_lead = config.get("articles","lead")
-	config_first_visit = config.get("articles","first_visit")
-	config_referer_url = config.get("articles","referer_url")
 	config_url = config.get("articles","url")
 	config_employee_name = config.get("articles","employee_name")
-	config_employee_job = config.get("articles","employee_job")
-	config_employee_company = config.get("articles","employee_company")
-	config_inferred_company = config.get("articles","inferred_company")
-	config_inferred_country = config.get("articles","inferred_country")
-	config_inferred_state = config.get("articles","inferred_state")
-	config_inferred_city = config.get("articles","inferred_city")
-	config_inferred_phone_area = config.get("articles","inferred_phone_area")
-	config_last_visit = config.get("articles","last_visit")
 
 
 
@@ -190,17 +164,12 @@ def articles_func(csvFilePath,config_file):
 
 				rel_dict={}
 
-				rel_dict["lead"] = (str(row[config_lead]).replace("'","")) 
-				rel_dict["first_visit"] = (str(row[config_first_visit]).replace("'","")) 
-				rel_dict["referer_url"] = (str(row[config_referer_url]).replace("'","")) 
-				rel_dict["employee_job"] = (str(row[config_employee_job]).replace("'","")) 
-				rel_dict["employee_company"] = (str(row[config_employee_company]).replace("'","")) 
-				rel_dict["inferred_company"] = (str(row[config_inferred_company]).replace("'","")) 
-				rel_dict["inferred_country"] = (str(row[config_inferred_country]).replace("'","")) 
-				rel_dict["inferred_state"] = (str(row[config_inferred_state]).replace("'","")) 
-				rel_dict["inferred_city"] = (str(row[config_inferred_city]).replace("'","")) 
-				rel_dict["inferred_phone_area"] = (str(row[config_inferred_phone_area]).replace("'","")) 
-				rel_dict["last_visit"] = (str(row[config_last_visit]).replace("'","")) 
+
+				for u in articleCol:
+
+					tmp = config.get("articles",u)
+		
+					rel_dict[u] = (str(row[tmp]).replace("'",""))
 				
 				if len(list(graph.match(start_node=individual.one,end_node=article.one, rel_type=("read",rel_dict)))) == 0:
 					graph.create(Path(individual.one,("read",rel_dict),article.one))

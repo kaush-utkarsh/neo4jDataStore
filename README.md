@@ -58,26 +58,35 @@ there will be two ini files to be used (one for leads and another for articles)
 the config file for leads: leads.ini would look like..
 
 ```
-[leads]
-l_id: Id
-last_name: Last Name
-first_name: First Name
-job: Job Title
-company: Company Name
-email: Email Address
-phone: Phone Number
-lead_score: Lead Score
-lead_source: Lead Source
-updated_at: Updated At
-job_function: Job Function
+[user]
+Id: Id
+last_name: Last_Name
+first_name: First_Name
+job: Job_Title
+company: Company_Name
+email: Email_Address
+phone: Phone_Number
+lead_score: Lead_Score
+lead_source: Lead_Source
+updated_at: Updated_At
+job_function: Job_Function
+
+[community]
+community: Community_Segment
+sub_community: Sub_Community
+
+[industry]
 industry: Industry
-community: Community Segment
-sub_community: Sub Community
+
+[country]
+country:
 
 ```
-Note: the header '[leads]' is part of ini and not supposed to be changed without reflective changes in code
+Note: the section headers '[user],[community],[industry],[country]' are part of ini and not supposed to be changed without reflective changes in code
 here the values in the left side of ':' are restrictive and constants, while the right side values are the column header texts of input csv(MarketoLeads csv)
 
+The compulsory fields are: Id, email, community, sub_community, industry and country.
+And The rest of the fields is the user's choice of entry.
 
 Similarly in case of articles the config file: articles.ini would look like..
 
@@ -101,5 +110,7 @@ last_visit: Last Visit (America/Los_Angeles)
 Note: the header '[articles]' is part of ini and not supposed to be changed without reflective changes in code
 here the values in the left side of ':' are restrictive and constants, while the right side values are the column header texts of input csv(Web_Page_activity csv)
 
+The compulsory fields are: url and employee_name.
+And The rest of the fields is the user's choice of entry.
 
 After every job a notification mail is sent to the admin explaining the action taken, file handles during the action, the number of tuples worked on and the total duration of the whole job. 
