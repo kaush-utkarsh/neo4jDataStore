@@ -17,6 +17,13 @@ def leads(csvFilePath, config_file):
 	
 	config = ConfigParser.ConfigParser()
 	config.read(config_file)
+
+	nodes = config.options("nodes")
+	print nodes
+	node1 = config.get("nodes",nodes[0])
+	print json.loads(node1)
+	# exit()
+
 	userCol = config.options("user")
 	industryCol = config.options("industry")
 	communityCol = config.options("community")
@@ -45,6 +52,30 @@ def leads(csvFilePath, config_file):
 
 	for row in reader:
 		try:
+			nodeList={}
+			for n in nodes:
+				node_atr = config.get("nodes",n)
+				attr = json.loads(node_atr)
+				print len(attr.keys())
+
+
+				if len(attr.keys())!=0:
+					individual_node = """ MERGE (idividual:"""+n+"""{"""
+
+					for attr_key in attr.keys():
+						individual_node=individual_node+str(attr_key)+""" :'"""+(str(row[attr[attr_key]]).replace("'",""))+"""', """
+					# print individual_node.strip(', ')
+					# exit()
+					individual_node = individual_node.strip(", ")+"""})
+					Return idividual;
+					"""
+					print individual_node
+					# exit()
+
+					individual = graph.cypher.execute(individual_node)				
+					nodeList[n]=individual
+			print nodeList
+			exit()
 			email = (str(row[config_email]).replace("'",""))
 			industry = (str(row[config_industry]).replace("'",""))
 			community = (str(row[config_community]).replace("'",""))
