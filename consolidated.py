@@ -13,31 +13,13 @@ start = datetime.datetime.now().strftime( "%d/%m/%Y %H:%M" )
 
 csvFilePath = ''
 config_file = ''
-def leads(csvFilePath, config_file):
+def leads(csvFilePath, config_file, act):
 	
 	config = ConfigParser.ConfigParser()
 	config.read(config_file)
 
 	nodes = config.options("nodes")
-	print nodes
-	node1 = config.get("nodes",nodes[0])
-	print json.loads(node1)
-	# exit()
-
-	userCol = config.options("user")
-	industryCol = config.options("industry")
-	communityCol = config.options("community")
-	countryCol = config.options("country")
-	
-	# parse config file 
-	config_l_id = config.get("user","Id")
-	config_email = config.get("user","email")
-	config_industry = config.get("industry","industry")
-	config_community = config.get("community","community")
-	config_sub_community = config.get("community","sub_community")
-	config_country = config.get("country","country")
-
-
+	relation = config.options("relation")
 
 	# fetch from csv and store in graph
 	print "Storing Leads"
@@ -56,162 +38,45 @@ def leads(csvFilePath, config_file):
 			for n in nodes:
 				node_atr = config.get("nodes",n)
 				attr = json.loads(node_atr)
-				print len(attr.keys())
-
-
-				if len(attr.keys())!=0:
-					individual_node = """ MERGE (idividual:"""+n+"""{"""
-
-					for attr_key in attr.keys():
-						individual_node=individual_node+str(attr_key)+""" :'"""+(str(row[attr[attr_key]]).replace("'",""))+"""', """
-					# print individual_node.strip(', ')
-					# exit()
-					individual_node = individual_node.strip(", ")+"""})
-					Return idividual;
-					"""
-					print individual_node
-					# exit()
-
-					individual = graph.cypher.execute(individual_node)				
-					nodeList[n]=individual
-			print nodeList
-			exit()
-			email = (str(row[config_email]).replace("'",""))
-			industry = (str(row[config_industry]).replace("'",""))
-			community = (str(row[config_community]).replace("'",""))
-			sub_community = (str(row[config_sub_community]).replace("'",""))
-			country = (str(row[config_country]).replace("'",""))
-			
-
-			iD = row[config_l_id]
-
-			if email!='' and iD!='':
-
+				individual_node = ""
 				try:
+					if bool(attr):
+						individual_node = """ MERGE ("""+act+""":"""+n+"""{"""
 
-					individual_node = """ MERGE (idividual:Individuals{id:'"""+iD+"""',email:'"""+email+"""'})
-					Return idividual;
-					"""
-					individual = graph.cypher.execute(individual_node)
+						for attr_key in attr.keys():
+							individual_node=individual_node+str(attr_key)+""" :'"""+(str(row[attr[attr_key]]).replace("'",""))+"""', """
+						individual_node = individual_node.strip(", ")+"""})
+						Return """+act+""";
+						"""
+						individual = graph.cypher.execute(individual_node)		
+						nodeList[n]=individual
+						indi_count=indi_count+1
+				except Exception,ee:
+					pass
 
-					for u in userCol:
+			for n in relation:
+				rel_atr = config.get("relation",n)
+				attr = json.loads(rel_atr)
+				try:
+					if bool(attr):
 
-						tmp = config.get("user",u)
-		
-						individual.one.properties[u] = str(row[tmp]).replace("'","")
+						start_node = attr['start_node']
+						end_node = attr['end_node']
+						attributes = attr['attributes']
+	
+						rel_dict={}
 
-					individual.one.push()				
-				except Exception,e:
-					print e
-					continue
-				# exit()
-				indi_count = indi_count + 1
+						for u in attributes.keys():
 
-				if industry != '':
-					company_node = """ MERGE (industry:Industry{name:'"""+industry+"""'})
-					Return industry;
-					"""
-					company = graph.cypher.execute(company_node)
-					
-					if len(list(graph.match(start_node=individual.one,end_node=company.one, rel_type="is_in_Industry"))) == 0:
-						graph.create(Path(individual.one,"is_in_Industry",company.one))
-				
-				if country != '':
-					company_node = """ MERGE (country:Country{name:'"""+country+"""'})
-					Return country;
-					"""
-					company = graph.cypher.execute(company_node)
-					
-					if len(list(graph.match(start_node=individual.one,end_node=company.one, rel_type="lives_in_country"))) == 0:
-						graph.create(Path(individual.one,"lives_in_country",company.one))
-				
-
-				if community!= '':
-					community_node = """ MERGE (community:Community{name:'"""+community+"""'})
-					Return community;
-					"""
-					community = graph.cypher.execute(community_node)
-
-					if len(list(graph.match(start_node=individual.one,end_node=community.one, rel_type="belongs_to_community"))) == 0:
-						graph.create(Path(individual.one,"belongs_to_community",community.one))
-				
-				if sub_community!= '':
-					sub_community_node = """ MERGE (sub_community:Sub_Community{name:'"""+sub_community+"""'})
-					Return sub_community;
-					"""
-					sub_community = graph.cypher.execute(sub_community_node)
-
-					if len(list(graph.match(start_node=individual.one,end_node=sub_community.one, rel_type="belongs_to_sub_community"))) == 0:
-						graph.create(Path(individual.one,"belongs_to_sub_community",sub_community.one))
-
-				
-		except Exception,e:
-			raise
-			exit()
-
-	reslt['individuals'] = str(indi_count)
+							rel_dict[u] = (str(row[attributes[u]]).replace("'",""))
+						
+						if len(list(graph.match(start_node=nodeList[start_node].one,end_node=nodeList[end_node].one, rel_type=(n,rel_dict)))) == 0:
+							graph.create(Path(nodeList[start_node].one,(n,rel_dict),nodeList[end_node].one))
+				except Exception,ee:
+					pass
+	reslt[act] = str(indi_count)
 
 	return reslt
-
-def articles_func(csvFilePath,config_file):
-	
-
-	config = ConfigParser.ConfigParser()
-	config.read(config_file)
-
-	articleCol = config.options("articles")
-	# parse config file 
-	config_url = config.get("articles","url")
-	config_employee_name = config.get("articles","employee_name")
-
-
-
-	print "storing articles"
-	graph = Graph("http://neo4j:root@localhost:7474/db/data/")
-
-	csvfile = open(csvFilePath)
-
-	reader = csv.DictReader(csvfile)
-	articles = {}
-	art_count = 0
-	for row in reader:
-
-		try:
-
-			if row[config_employee_name]!='':	
-				name = (str(row[config_employee_name]).replace("'",""))
-				art = 'https://www.brighttalk.com'+row[config_url]
-
-				individual_node = """ MERGE (idividual:Individuals{name:'"""+name+"""'})
-				Return idividual;
-				"""
-				individual = graph.cypher.execute(individual_node)
-
-				article_node = """ MERGE (article:Article{url:'"""+art+"""',processed:'no'})
-				Return article;
-				"""
-				article = graph.cypher.execute(article_node)
-				art_count = art_count + 1
-
-				rel_dict={}
-
-
-				for u in articleCol:
-
-					tmp = config.get("articles",u)
-		
-					rel_dict[u] = (str(row[tmp]).replace("'",""))
-				
-				if len(list(graph.match(start_node=individual.one,end_node=article.one, rel_type=("read",rel_dict)))) == 0:
-					graph.create(Path(individual.one,("read",rel_dict),article.one))
-
-
-		except Exception,e:
-			print e
-			pass
-
-	return {'articles': str(art_count)}
-
 
 def key_entity():
 
@@ -226,7 +91,7 @@ def key_entity():
 
 	graph = Graph("http://neo4j:root@localhost:7474/db/data/")
 
-	article_query =  """MATCH (n:Article{processed:'no'}) 
+	article_query =  """MATCH (n:article) 
 						Return distinct n.url as url"""
 
 	result = graph.cypher.execute(article_query)
@@ -243,7 +108,7 @@ def key_entity():
 
 		art = arti['url']
 
-		article_node = """ MATCH (article:Article{url:'"""+art+"""'})
+		article_node = """ MATCH (article:article{url:'"""+art+"""'})
 		SET article.processed = 'yes'
 		Return article;
 		"""
@@ -341,58 +206,27 @@ if len(sys.argv)<=1:
 else:
 	action = sys.argv[1]	
 
-	if action == 'leads':
-		csvFilePath = sys.argv[2]
-		config_file = sys.argv[3]
-		try:
-			resultDict = leads(csvFilePath,config_file)
-		except Exception,e:
-			print e
-			msg = """
-			Hi, \n 
-			This is an update related to the job triggered on """+str(start)+""", for the insertion of data in your Neo4J graph base. \n
-			The code could not complete the run because of insufficient parameters supplied to the query \n 
-			Regards """
+	csvFilePath = sys.argv[2]
+	config_file = sys.argv[3]
+	try:
+		resultDict = leads(csvFilePath,config_file,action)
+	except Exception,e:
+		print e
+		msg = """
+		Hi, \n 
+		This is an update related to the job triggered on """+str(start)+""", for the insertion of data in your Neo4J graph base. \n
+		The code could not complete the run because of insufficient parameters supplied to the query \n 
+		Regards """
 
-			subj = "Update for uLytics job on Neo4J"
-
-
-			msgBod = "From: %s\nTo: %s\nSubject: %s\nDate: %s\n\n%s" % ( from_addr, to_addr, subj, start, msg )
-
-			emailUpdate(from_addr,to_addr,msgBod)
-
-			exit()
-			pass
-
-	elif action == 'articles':
-		csvFilePath = sys.argv[2]
-		config_file = sys.argv[3]
-		try:
-			resultDict = articles_func(csvFilePath,config_file)
-		except Exception,e:
-			print e
-			msg = """
-			Hi, \n 
-			This is an update related to the job triggered on """+str(start)+""", for the insertion of data in your Neo4J graph base. \n
-			The code could not complete the run because of insufficient parameters supplied to the query \n 
-			Regards """
-
-			subj = "Update for uLytics job on Neo4J"
+		subj = "Update for uLytics job on Neo4J"
 
 
-			msgBod = "From: %s\nTo: %s\nSubject: %s\nDate: %s\n\n%s" % ( from_addr, to_addr, subj, start, msg )
+		msgBod = "From: %s\nTo: %s\nSubject: %s\nDate: %s\n\n%s" % ( from_addr, to_addr, subj, start, msg )
 
-			emailUpdate(from_addr,to_addr,msgBod)
+		emailUpdate(from_addr,to_addr,msgBod)
 
-			exit()
-			pass
-
-	else:
-		try:
-			resultDict = key_entity()
-		except Exception,e:
-			print e
-			pass
+		exit()
+		pass
 
 end = datetime.datetime.now().strftime( "%d/%m/%Y %H:%M" )
 
@@ -414,4 +248,4 @@ subj = "Update for uLytics job on Neo4J"
 msgBod = "From: %s\nTo: %s\nSubject: %s\nDate: %s\n\n%s" % ( from_addr, to_addr, subj, end, msg )
 
 
-emailUpdate(from_addr,to_addr,msgBod)
+# emailUpdate(from_addr,to_addr,msgBod)

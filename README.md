@@ -20,24 +20,15 @@ Lets start from the very begining:
 
 We begin with the addition of leads to the db.
 
-The command to save the leads is:
+The command to save the leads/articles is:
 
 ```
-python consolidated.py leads path_to_the_file path_to_config_file
-```
-Where the path_to_the_file is the path to the CSV file
-
-
-
-The next part is the addition of articles to the db.
-
-The command to save the articles is:
-
-```
-python consolidated.py articles path_to_the_file path_to_config_file
+python consolidated.py action path_to_the_file path_to_config_file
 ```
 Where the path_to_the_file is the path to the CSV file
+And the action can be either "leads" or "article"
 
+this will work for both the article and individual lead csvs
 
 The last part is the keywords and entity extraction to the db.
 
@@ -55,62 +46,19 @@ a config file is a file with an ".ini" extension
 there will be two ini files to be used (one for leads and another for articles)
 
 
-the config file for leads: leads.ini would look like..
+the config file for leads: would look like..
 
 ```
-[user]
-Id: Id
-last_name: Last_Name
-first_name: First_Name
-job: Job_Title
-company: Company_Name
-email: Email_Address
-phone: Phone_Number
-lead_score: Lead_Score
-lead_source: Lead_Source
-updated_at: Updated_At
-job_function: Job_Function
+[nodes]
 
-[community]
-community: Community_Segment
-sub_community: Sub_Community
+user:{ "id":"Id", "fname":"First_Name", "lname":"Last_Name", "email":"Email_Address" }
+country:{}
+industry:{"name":"Industry”}
 
-[industry]
-industry: Industry
+[relation]
+works_in:{"start_node":"user","end_node":"industry" attributes:{"job":"Job_Title","company":"Company_Name"}}
 
-[country]
-country:
 
 ```
-Note: the section headers '[user],[community],[industry],[country]' are part of ini and not supposed to be changed without reflective changes in code
-here the values in the left side of ':' are restrictive and constants, while the right side values are the column header texts of input csv(MarketoLeads csv)
-
-The compulsory fields are: Id, email, community, sub_community, industry and country.
-And The rest of the fields is the user's choice of entry.
-
-Similarly in case of articles the config file: articles.ini would look like..
-
-```
-[articles]
-lead: Lead
-first_visit: First Visit (America/Los_Angeles)
-referer_url: HTTP Referer
-url: Entry Page
-employee_name: Name
-employee_job: Job Title
-employee_company: Company
-inferred_company: Inferred Company or ISP
-inferred_country: Inferred Country
-inferred_state: Inferred State/Region
-inferred_city: Inferred City
-inferred_phone_area: Inferred Phone Area Code
-last_visit: Last Visit (America/Los_Angeles)
-
-```
-Note: the header '[articles]' is part of ini and not supposed to be changed without reflective changes in code
-here the values in the left side of ':' are restrictive and constants, while the right side values are the column header texts of input csv(Web_Page_activity csv)
-
-The compulsory fields are: url and employee_name.
-And The rest of the fields is the user's choice of entry.
 
 After every job a notification mail is sent to the admin explaining the action taken, file handles during the action, the number of tuples worked on and the total duration of the whole job. 
